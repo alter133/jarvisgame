@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My 3D Test Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: Arial;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+<div id="info">Move: WASD | Collect cubes</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+let scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111111);
+
+let camera = new THREE.PerspectiveCamera(
+  75,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  1000
+);
+
+let renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Player (blue cube)
+let playerGeo = new THREE.BoxGeometry();
+let playerMat = new THREE.MeshBasicMaterial({ color: 0x00aaff });
+let player = new THREE.Mesh(playerGeo, playerMat);
+scene.add(player);
+
+// Ground
+let groundGeo = new THREE.BoxGeometry(50, 1, 50);
+let groundMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
+let ground = new THREE.Mesh(groundGeo, groundMat);
+ground.position.y = -1;
+scene.add(ground);
+
+// Collectibles
+let cubes = [];
+for (let i = 0; i < 10; i++) {
+  let geo = new THREE.BoxGeometry(1,1,1);
+  let mat = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+  let cube = new THREE.Mesh(geo, mat);
+
+  cube.position.x = (Math.random() - 0.5) * 40;
+  cube.position.z = (Math.random() - 0.5) * 40;
+  cube.position.y = 0.5;
+
+  scene.add(cube);
+  cubes.push(cube);
+}
+
+camera.position.z = 10;
+camera.position.y = 8;
+camera.lookAt(0,0,0);
+
+// Movement
+let keys = {};
+document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+let score = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (keys["w"]) player.position.z -= 0.2;
+  if (keys["s"]) player.position.z += 0.2;
+  if (keys["a"]) player.position.x -= 0.2;
+  if (keys["d"]) player.position.x += 0.2;
+
+  camera.position.x = player.position.x;
+  camera.position.z = player.position.z + 10;
+  camera.lookAt(player.position);
+
+  // Collect cubes
+  cubes.forEach((c, i) => {
+    if (player.position.distanceTo(c.position) < 1) {
+      scene.remove(c);
+      cubes.splice(i, 1);
+      score++;
+      console.log("Score:", score);
+    }
+  });
+
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+</html>
