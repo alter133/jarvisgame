@@ -2,105 +2,636 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>My 3D Test Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neon Salvage Simulator</title>
   <style>
-    body { margin: 0; overflow: hidden; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #050816; font-family: Arial, Helvetica, sans-serif; }
     canvas { display: block; }
-    #info {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: white;
-      font-family: Arial;
-      z-index: 10;
+    #hud {
+      position: fixed; inset: 0; pointer-events: none; color: #eaf2ff;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
     }
+    .panel {
+      position: absolute; background: rgba(8, 14, 28, 0.58); border: 1px solid rgba(130, 170, 255, 0.22);
+      box-shadow: 0 0 30px rgba(73, 130, 255, 0.12), inset 0 0 24px rgba(73, 130, 255, 0.06);
+      backdrop-filter: blur(8px); border-radius: 18px; pointer-events: auto;
+    }
+    #topbar { left: 14px; top: 14px; padding: 12px 14px; min-width: 280px; }
+    #shop { right: 14px; top: 14px; width: 290px; padding: 12px; }
+    #centerTip {
+      left: 50%; top: 50%; transform: translate(-50%, -50%);
+      padding: 10px 16px; font-size: 14px; border-radius: 999px; opacity: 0.92;
+    }
+    #log { left: 14px; bottom: 14px; padding: 10px 12px; width: min(420px, calc(100vw - 28px)); font-size: 13px; line-height: 1.35; }
+    #barWrap { margin-top: 10px; }
+    .bar {
+      width: 100%; height: 12px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .fill { height: 100%; width: 0%; border-radius: 999px; }
+    .fill.energy { background: linear-gradient(90deg, #41f2ff, #5280ff); }
+    .fill.boost { background: linear-gradient(90deg, #ffd75a, #ff8c4a); }
+    .title { font-size: 18px; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .small { font-size: 12px; opacity: 0.88; }
+    .row { display: flex; justify-content: space-between; gap: 12px; margin: 4px 0; font-size: 14px; }
+    .btn {
+      display: block; width: 100%; margin-top: 8px; padding: 10px 12px; border: 0; border-radius: 14px; cursor: pointer;
+      color: #eff6ff; background: linear-gradient(180deg, rgba(90,130,255,0.95), rgba(41,65,160,0.95));
+      box-shadow: 0 10px 24px rgba(26, 56, 164, 0.28); font-weight: 700; text-align: left;
+    }
+    .btn:hover { filter: brightness(1.07); }
+    .btn:active { transform: translateY(1px); }
+    .btn .cost { float: right; opacity: 0.92; }
+    .btn.disabled { opacity: 0.45; cursor: not-allowed; }
+    #minimap {
+      position: absolute; right: 18px; bottom: 18px; width: 170px; height: 170px; border-radius: 18px;
+      background: rgba(8, 14, 28, 0.45); border: 1px solid rgba(130, 170, 255, 0.22);
+      box-shadow: 0 0 30px rgba(73, 130, 255, 0.1); pointer-events: none;
+    }
+    #miniLabel { position: absolute; right: 22px; bottom: 194px; font-size: 12px; opacity: 0.82; }
+    #startOverlay {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at center, rgba(10,18,40,0.42), rgba(0,0,0,0.72));
+      color: white; z-index: 30;
+    }
+    #startCard {
+      width: min(560px, calc(100vw - 28px)); padding: 24px; border-radius: 24px; text-align: center;
+      background: rgba(8, 14, 28, 0.72); border: 1px solid rgba(130, 170, 255, 0.22);
+      box-shadow: 0 0 60px rgba(82, 128, 255, 0.2);
+    }
+    #startCard h1 { margin: 0 0 8px; font-size: 34px; }
+    #startCard p { margin: 8px 0; line-height: 1.45; opacity: 0.92; }
+    #startBtn {
+      pointer-events: auto; margin-top: 12px; border: 0; border-radius: 16px; padding: 12px 18px; font-weight: 800; cursor: pointer;
+      color: #08101f; background: linear-gradient(90deg, #89f3ff, #8a9cff, #ffd75a);
+    }
+    .kbd { display: inline-block; min-width: 22px; padding: 2px 6px; border-radius: 7px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.12); }
   </style>
 </head>
 <body>
-<div id="info">Move: WASD | Collect cubes</div>
+  <div id="hud">
+    <div id="topbar" class="panel">
+      <div class="title">Neon Salvage Simulator</div>
+      <div class="row"><span>Credits</span><strong id="credits">0</strong></div>
+      <div class="row"><span>Scrap Value</span><strong id="scrap">0</strong></div>
+      <div class="row"><span>Level</span><strong id="level">1</strong></div>
+      <div class="row"><span>Distance</span><strong id="distance">0</strong></div>
+      <div id="barWrap">
+        <div class="small">Battery</div>
+        <div class="bar"><div id="energyFill" class="fill energy"></div></div>
+        <div class="small" style="margin-top:8px;">Boost</div>
+        <div class="bar"><div id="boostFill" class="fill boost"></div></div>
+      </div>
+    </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <div id="shop" class="panel">
+      <div class="title">Upgrade Dock</div>
+      <div class="small">Spend credits to make the runner stronger. Costs rise every buy.</div>
+      <button id="buySpeed" class="btn">Thrusters <span class="cost" id="costSpeed"></span></button>
+      <button id="buyMagnet" class="btn">Magnet Field <span class="cost" id="costMagnet"></span></button>
+      <button id="buyBattery" class="btn">Battery Pack <span class="cost" id="costBattery"></span></button>
+      <button id="buyBoost" class="btn">Boost Core <span class="cost" id="costBoost"></span></button>
+      <button id="resetSave" class="btn" style="background: linear-gradient(180deg, rgba(255,119,119,0.85), rgba(163,42,60,0.95));">Reset Save</button>
+    </div>
 
-<script>
-let scene = new THREE.Scene();
-scene.background = new THREE.Color(0x111111);
+    <div id="centerTip" class="panel">
+      <span class="kbd">WASD</span> move &nbsp; <span class="kbd">Shift</span> boost &nbsp; <span class="kbd">E</span> auto-sell at station
+    </div>
 
-let camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
+    <div id="log" class="panel">
+      Fly through glowing salvage fields, collect energy shards, and build your ship forever.
+    </div>
 
-let renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+    <div id="miniLabel">Radar</div>
+    <canvas id="minimap" width="170" height="170"></canvas>
+  </div>
 
-// Player (blue cube)
-let playerGeo = new THREE.BoxGeometry();
-let playerMat = new THREE.MeshBasicMaterial({ color: 0x00aaff });
-let player = new THREE.Mesh(playerGeo, playerMat);
-scene.add(player);
+  <div id="startOverlay">
+    <div id="startCard">
+      <h1>Neon Salvage Simulator</h1>
+      <p>Explore an endless neon sky, scoop up drifting salvage, and keep upgrading forever. The world generates as you move, so the grind never ends.</p>
+      <p><strong>Controls:</strong> WASD move, Shift boost, E sell at station, mouse is optional.</p>
+      <button id="startBtn">Start Flying</button>
+    </div>
+  </div>
 
-// Ground
-let groundGeo = new THREE.BoxGeometry(50, 1, 50);
-let groundMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
-let ground = new THREE.Mesh(groundGeo, groundMat);
-ground.position.y = -1;
-scene.add(ground);
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script>
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x08101f, 0.018);
+    scene.background = new THREE.Color(0x050816);
 
-// Collectibles
-let cubes = [];
-for (let i = 0; i < 10; i++) {
-  let geo = new THREE.BoxGeometry(1,1,1);
-  let mat = new THREE.MeshBasicMaterial({ color: 0xff4444 });
-  let cube = new THREE.Mesh(geo, mat);
+    const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    document.body.appendChild(renderer.domElement);
 
-  cube.position.x = (Math.random() - 0.5) * 40;
-  cube.position.z = (Math.random() - 0.5) * 40;
-  cube.position.y = 0.5;
+    const clock = new THREE.Clock();
+    const keys = {};
+    let gameStarted = false;
 
-  scene.add(cube);
-  cubes.push(cube);
-}
+    const state = {
+      credits: 0,
+      scrap: 0,
+      level: 1,
+      xp: 0,
+      distance: 0,
+      speed: 9,
+      speedLevel: 0,
+      magnetLevel: 0,
+      batteryLevel: 0,
+      boostLevel: 0,
+      energy: 100,
+      maxEnergy: 100,
+      boost: 100,
+      maxBoost: 100,
+      boostActive: false,
+      autoSellTimer: 0,
+      message: 'Fly through glowing salvage fields, collect energy shards, and build your ship forever.',
+      best: 0
+    };
 
-camera.position.z = 10;
-camera.position.y = 8;
-camera.lookAt(0,0,0);
-
-// Movement
-let keys = {};
-document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
-document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
-
-let score = 0;
-
-function animate() {
-  requestAnimationFrame(animate);
-
-  if (keys["w"]) player.position.z -= 0.2;
-  if (keys["s"]) player.position.z += 0.2;
-  if (keys["a"]) player.position.x -= 0.2;
-  if (keys["d"]) player.position.x += 0.2;
-
-  camera.position.x = player.position.x;
-  camera.position.z = player.position.z + 10;
-  camera.lookAt(player.position);
-
-  // Collect cubes
-  cubes.forEach((c, i) => {
-    if (player.position.distanceTo(c.position) < 1) {
-      scene.remove(c);
-      cubes.splice(i, 1);
-      score++;
-      console.log("Score:", score);
+    const saveKey = 'neonSalvageSave_v1';
+    function loadSave() {
+      try {
+        const raw = localStorage.getItem(saveKey);
+        if (!raw) return;
+        const s = JSON.parse(raw);
+        Object.assign(state, s);
+      } catch (e) {}
     }
-  });
+    function saveGame() {
+      const s = {
+        credits: state.credits,
+        scrap: state.scrap,
+        level: state.level,
+        xp: state.xp,
+        distance: state.distance,
+        speed: state.speed,
+        speedLevel: state.speedLevel,
+        magnetLevel: state.magnetLevel,
+        batteryLevel: state.batteryLevel,
+        boostLevel: state.boostLevel,
+        energy: state.energy,
+        maxEnergy: state.maxEnergy,
+        boost: state.boost,
+        maxBoost: state.maxBoost,
+        best: state.best
+      };
+      localStorage.setItem(saveKey, JSON.stringify(s));
+    }
+    loadSave();
 
-  renderer.render(scene, camera);
-}
+    const ambient = new THREE.AmbientLight(0x9fb8ff, 0.65);
+    scene.add(ambient);
+    const sun = new THREE.DirectionalLight(0xaad4ff, 1.25);
+    sun.position.set(6, 12, 8);
+    scene.add(sun);
+    const rim = new THREE.PointLight(0x2e7fff, 3, 80);
+    rim.position.set(0, 6, 0);
+    scene.add(rim);
 
-animate();
-</script>
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x132039, metalness: 0.2, roughness: 0.95 });
+    const platformMat = new THREE.MeshStandardMaterial({ color: 0x1d335a, metalness: 0.25, roughness: 0.7, emissive: 0x081425, emissiveIntensity: 0.6 });
+    const glowMat = new THREE.MeshStandardMaterial({ color: 0x49a6ff, metalness: 0.9, roughness: 0.15, emissive: 0x2d67ff, emissiveIntensity: 1.1 });
+    const salvageMat = new THREE.MeshStandardMaterial({ color: 0xffcc55, metalness: 0.4, roughness: 0.3, emissive: 0x7a4d00, emissiveIntensity: 0.55 });
+    const enemyMat = new THREE.MeshStandardMaterial({ color: 0xff5d78, metalness: 0.45, roughness: 0.25, emissive: 0x8d1230, emissiveIntensity: 0.8 });
+
+    // Player ship
+    const ship = new THREE.Group();
+    scene.add(ship);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.0, 2.2, 8), new THREE.MeshStandardMaterial({ color: 0xeaf2ff, metalness: 0.8, roughness: 0.2, emissive: 0x08101f, emissiveIntensity: 0.25 }));
+    body.rotation.z = Math.PI / 2;
+    ship.add(body);
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.45, 18, 18), glowMat);
+    ship.add(core);
+    const wing1 = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.08, 0.5), platformMat);
+    wing1.position.set(0, -0.35, 0.55);
+    ship.add(wing1);
+    const wing2 = wing1.clone();
+    wing2.position.z = -0.55;
+    ship.add(wing2);
+    const engine1 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.22, 0.8, 10), new THREE.MeshStandardMaterial({ color: 0x84dfff, emissive: 0x2f8cff, emissiveIntensity: 1 }));
+    engine1.rotation.z = Math.PI / 2; engine1.position.set(-1.0, 0.0, 0.35); ship.add(engine1);
+    const engine2 = engine1.clone(); engine2.position.z = -0.35; ship.add(engine2);
+    ship.position.set(0, 4.5, 0);
+
+    // World chunks
+    const chunks = new Map();
+    const salvageItems = [];
+    const hazards = [];
+    const stations = [];
+    const tempVec = new THREE.Vector3();
+    const tempVec2 = new THREE.Vector3();
+
+    function rand(seed) {
+      const x = Math.sin(seed * 999.123 + 1.2345) * 10000;
+      return x - Math.floor(x);
+    }
+    function terrainHeight(x, z) {
+      const n1 = Math.sin(x * 0.055) * 1.6 + Math.cos(z * 0.06) * 1.6;
+      const n2 = Math.sin((x + z) * 0.022) * 1.8;
+      return 0.4 * n1 + 0.45 * n2;
+    }
+
+    function makeChunk(cx, cz) {
+      const key = `${cx},${cz}`;
+      if (chunks.has(key)) return chunks.get(key);
+      const group = new THREE.Group();
+      group.position.set(cx * 40, 0, cz * 40);
+      scene.add(group);
+
+      const h = terrainHeight(cx, cz);
+      const baseGeo = new THREE.CylinderGeometry(10 + rand(cx * 19 + cz) * 6, 12 + rand(cx * 29 + cz) * 4, 2 + rand(cx * 7 + cz) * 2, 8, 1);
+      const base = new THREE.Mesh(baseGeo, groundMat);
+      base.position.y = h - 3;
+      base.rotation.y = rand(cx * 3 + cz * 7) * Math.PI;
+      group.add(base);
+
+      const pad = new THREE.Mesh(new THREE.BoxGeometry(16, 0.6, 16), platformMat);
+      pad.position.y = h + 0.2;
+      group.add(pad);
+
+      const rail = new THREE.Mesh(new THREE.TorusGeometry(7.2, 0.15, 6, 24), glowMat);
+      rail.position.y = h + 0.75;
+      rail.rotation.x = Math.PI / 2;
+      rail.rotation.z = rand(cx + cz) * Math.PI;
+      group.add(rail);
+
+      const lightPole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 4.5, 8), platformMat);
+      lightPole.position.set(0, h + 2.5, 0);
+      group.add(lightPole);
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), glowMat);
+      beacon.position.set(0, h + 5.0, 0);
+      group.add(beacon);
+
+      if ((Math.abs(cx) + Math.abs(cz)) % 5 === 0) {
+        const station = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.8, 1.6, 12), new THREE.MeshStandardMaterial({ color: 0x7bf0ff, emissive: 0x2265ff, emissiveIntensity: 0.85, metalness: 0.7, roughness: 0.2 }));
+        station.position.set(4, h + 1.4, -4);
+        group.add(station);
+        stations.push({ mesh: station, baseY: h + 1.4, cx, cz, cooldown: 0 });
+      }
+
+      for (let i = 0; i < 4 + Math.floor(rand(cx + cz) * 4); i++) {
+        const ox = (rand(cx * 11 + cz * 13 + i) - 0.5) * 20;
+        const oz = (rand(cx * 17 + cz * 23 + i * 2) - 0.5) * 20;
+        const oy = h + 1.2 + rand(cx * 3 + cz * 5 + i) * 3;
+        const kind = rand(cx * 31 + cz * 41 + i);
+        if (kind < 0.72) {
+          const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(0.45 + rand(i + cx) * 0.35, 0), salvageMat);
+          orb.position.set(ox, oy, oz);
+          orb.userData = { value: 10 + Math.floor(rand(i + 2) * 18), spin: 0.4 + rand(i + 3) * 1.2, bob: rand(i + 4) * Math.PI * 2, kind: 'scrap' };
+          group.add(orb);
+          salvageItems.push(orb);
+        } else {
+          const enemy = new THREE.Mesh(new THREE.OctahedronGeometry(0.7, 0), enemyMat);
+          enemy.position.set(ox, oy + 0.5, oz);
+          enemy.userData = { hp: 3, dmg: 8, spin: 0.8 + rand(i + 5) * 0.8, kind: 'drone', vx: (rand(i + 6) - 0.5) * 0.12, vz: (rand(i + 7) - 0.5) * 0.12, bob: rand(i + 8) * Math.PI * 2 };
+          group.add(enemy);
+          hazards.push(enemy);
+        }
+      }
+
+      const propsCount = 5 + Math.floor(rand(cx + cz * 2) * 6);
+      for (let i = 0; i < propsCount; i++) {
+        const px = (rand(cx * 91 + i * 2) - 0.5) * 24;
+        const pz = (rand(cz * 77 + i * 3) - 0.5) * 24;
+        const py = h + rand(i + cx * 5) * 0.8;
+        const t = rand(i * 8 + cx + cz);
+        const obj = t < 0.35 ?
+          new THREE.Mesh(new THREE.BoxGeometry(0.5 + t * 1.2, 0.8 + t * 1.8, 0.5 + t * 1.2), platformMat) :
+          new THREE.Mesh(new THREE.ConeGeometry(0.35 + t, 1.2 + t * 2, 6), glowMat);
+        obj.position.set(px, py + 0.6, pz);
+        obj.rotation.y = rand(px + pz) * Math.PI;
+        group.add(obj);
+      }
+
+      const data = { group, cx, cz, h };
+      chunks.set(key, data);
+      return data;
+    }
+
+    function maintainWorld() {
+      const px = Math.floor(ship.position.x / 40);
+      const pz = Math.floor(ship.position.z / 40);
+      const radius = 3;
+      for (let x = px - radius; x <= px + radius; x++) {
+        for (let z = pz - radius; z <= pz + radius; z++) makeChunk(x, z);
+      }
+      for (const [key, chunk] of chunks) {
+        if (Math.abs(chunk.cx - px) > radius + 2 || Math.abs(chunk.cz - pz) > radius + 2) {
+          scene.remove(chunk.group);
+          chunks.delete(key);
+        }
+      }
+    }
+
+    function xpNeeded(level) {
+      return Math.floor(35 + Math.pow(level, 1.35) * 18);
+    }
+    function addXp(amount) {
+      state.xp += amount;
+      while (state.xp >= xpNeeded(state.level)) {
+        state.xp -= xpNeeded(state.level);
+        state.level++;
+        state.credits += 25 + state.level * 10;
+        state.maxEnergy += 4;
+        state.maxBoost += 3;
+        state.message = `Level up! Ship systems upgraded. You earned bonus credits.`;
+      }
+    }
+    function setMessage(msg) {
+      state.message = msg;
+      document.getElementById('log').textContent = msg;
+    }
+
+    function upgradeCost(kind) {
+      if (kind === 'speed') return 40 + state.speedLevel * 30;
+      if (kind === 'magnet') return 60 + state.magnetLevel * 45;
+      if (kind === 'battery') return 70 + state.batteryLevel * 55;
+      if (kind === 'boost') return 80 + state.boostLevel * 60;
+      return 0;
+    }
+    function buy(kind) {
+      const cost = upgradeCost(kind);
+      if (state.credits < cost) {
+        setMessage('Not enough credits yet. Keep salvaging or sell more scrap.');
+        return;
+      }
+      state.credits -= cost;
+      if (kind === 'speed') {
+        state.speedLevel++;
+        state.speed += 1.15;
+        setMessage('Thrusters upgraded. You move faster now.');
+      } else if (kind === 'magnet') {
+        state.magnetLevel++;
+        setMessage('Magnet field strengthened. Nearby salvage pulls in harder.');
+      } else if (kind === 'battery') {
+        state.batteryLevel++;
+        state.maxEnergy += 16;
+        state.energy = Math.min(state.maxEnergy, state.energy + 24);
+        setMessage('Battery pack installed. More energy capacity.');
+      } else if (kind === 'boost') {
+        state.boostLevel++;
+        state.maxBoost += 18;
+        state.boost = state.maxBoost;
+        setMessage('Boost core improved. Longer, stronger bursts.');
+      }
+      saveGame();
+      updateShop();
+    }
+
+    function updateShop() {
+      const buttons = [
+        ['buySpeed', 'costSpeed', 'speed', `Thrusters + speed ${state.speedLevel + 1}`],
+        ['buyMagnet', 'costMagnet', 'magnet', `Magnet Field ${state.magnetLevel + 1}`],
+        ['buyBattery', 'costBattery', 'battery', `Battery Pack ${state.batteryLevel + 1}`],
+        ['buyBoost', 'costBoost', 'boost', `Boost Core ${state.boostLevel + 1}`],
+      ];
+      for (const [btnId, costId, kind, label] of buttons) {
+        const btn = document.getElementById(btnId);
+        const cost = upgradeCost(kind);
+        document.getElementById(costId).textContent = `${cost} cr`;
+        btn.firstChild.textContent = label + ' ';
+        btn.classList.toggle('disabled', state.credits < cost);
+      }
+    }
+
+    document.getElementById('buySpeed').onclick = () => buy('speed');
+    document.getElementById('buyMagnet').onclick = () => buy('magnet');
+    document.getElementById('buyBattery').onclick = () => buy('battery');
+    document.getElementById('buyBoost').onclick = () => buy('boost');
+    document.getElementById('resetSave').onclick = () => {
+      localStorage.removeItem(saveKey);
+      location.reload();
+    };
+
+    document.getElementById('startBtn').onclick = () => {
+      gameStarted = true;
+      document.getElementById('startOverlay').style.display = 'none';
+      setMessage('Starting engines. Salvage the sky, sell at stations, and keep upgrading forever.');
+    };
+
+    addEventListener('keydown', (e) => {
+      keys[e.key.toLowerCase()] = true;
+      if (e.key.toLowerCase() === 'e') trySell();
+      if (e.key === 'Escape' && gameStarted) {
+        // Keep simple: no pause menu. Just ignore.
+      }
+    });
+    addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+    function trySell() {
+      let sold = 0;
+      let soldCount = 0;
+      for (let i = salvageItems.length - 1; i >= 0; i--) {
+        const obj = salvageItems[i];
+        if (!obj.parent) continue;
+        if (obj.position.distanceTo(ship.position) < 3.2) {
+          sold += obj.userData.value;
+          soldCount++;
+          obj.parent.remove(obj);
+          salvageItems.splice(i, 1);
+        }
+      }
+      if (soldCount > 0) {
+        state.credits += sold;
+        state.scrap = 0;
+        setMessage(`Sold ${soldCount} pieces of salvage for ${sold} credits.`);
+        saveGame();
+        updateShop();
+      } else {
+        setMessage('No salvage close enough to sell. Move near a station or collect more first.');
+      }
+    }
+
+    function collectSalvage(delta) {
+      const magnetRange = 5 + state.magnetLevel * 1.8;
+      for (let i = salvageItems.length - 1; i >= 0; i--) {
+        const obj = salvageItems[i];
+        if (!obj.parent) continue;
+        obj.userData.bob += delta * 2;
+        obj.position.y += Math.sin(obj.userData.bob) * 0.008;
+        obj.rotation.x += delta * obj.userData.spin;
+        obj.rotation.y += delta * obj.userData.spin * 1.3;
+
+        const dist = obj.position.distanceTo(ship.position);
+        if (dist < magnetRange) {
+          obj.position.lerp(ship.position, 0.05 + state.magnetLevel * 0.01);
+        }
+        if (dist < 1.55) {
+          const value = obj.userData.value;
+          state.scrap += value;
+          state.credits += Math.floor(value * 0.25);
+          addXp(4 + Math.floor(value * 0.5));
+          obj.parent.remove(obj);
+          salvageItems.splice(i, 1);
+          setMessage(`Collected salvage +${value} value.`);
+        }
+      }
+    }
+
+    function updateHazards(delta) {
+      for (const d of hazards) {
+        if (!d.parent) continue;
+        d.userData.bob += delta * 1.8;
+        d.position.y += Math.sin(d.userData.bob) * 0.01;
+        d.rotation.x += delta * d.userData.spin;
+        d.rotation.y += delta * d.userData.spin * 0.9;
+        d.position.x += d.userData.vx;
+        d.position.z += d.userData.vz;
+        if (d.position.distanceTo(ship.position) < 1.5) {
+          state.energy -= 10;
+          d.userData.hp -= 1;
+          d.position.add(new THREE.Vector3((Math.random()-0.5)*2, 0.8, (Math.random()-0.5)*2));
+          if (d.userData.hp <= 0) {
+            d.parent.remove(d);
+            addXp(10);
+            state.credits += 8;
+            setMessage('Hazard destroyed. Bonus credits recovered from the wreck.');
+          } else {
+            setMessage('Took a hit from a rogue drone.');
+          }
+        }
+      }
+    }
+
+    function updateStations(delta) {
+      for (const s of stations) {
+        if (!s.mesh.parent) continue;
+        s.mesh.rotation.y += delta * 0.6;
+        const dist = s.mesh.position.distanceTo(ship.position);
+        if (dist < 4.2) {
+          if (state.autoSellTimer <= 0) {
+            state.credits += Math.floor(state.scrap * 0.7);
+            state.scrap = 0;
+            state.energy = Math.min(state.maxEnergy, state.energy + 25);
+            state.boost = Math.min(state.maxBoost, state.boost + 35);
+            state.autoSellTimer = 1.2;
+            setMessage('Dock transfer complete. Scrap converted, battery recharged.');
+            saveGame();
+            updateShop();
+          }
+        }
+      }
+      if (state.autoSellTimer > 0) state.autoSellTimer -= delta;
+    }
+
+    function updateMovement(delta) {
+      const forward = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
+      const strafe = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
+      const boostHeld = keys['shift'];
+      state.boostActive = boostHeld && state.boost > 0 && gameStarted;
+
+      const accel = (state.speed * (state.boostActive ? 1.7 : 1.0)) * delta;
+      const move = new THREE.Vector3(strafe, 0, -forward);
+      if (move.lengthSq() > 0) {
+        move.normalize();
+        ship.position.x += move.x * accel;
+        ship.position.z += move.z * accel;
+        ship.rotation.z = THREE.MathUtils.lerp(ship.rotation.z, -move.x * 0.28, 0.1);
+        ship.rotation.x = THREE.MathUtils.lerp(ship.rotation.x, move.z * 0.14, 0.1);
+      } else {
+        ship.rotation.z = THREE.MathUtils.lerp(ship.rotation.z, 0, 0.08);
+        ship.rotation.x = THREE.MathUtils.lerp(ship.rotation.x, 0, 0.08);
+      }
+
+      ship.position.y = 4.4 + Math.sin(performance.now() * 0.004) * 0.15;
+      core.scale.setScalar(1 + Math.sin(performance.now() * 0.007) * 0.08);
+
+      if (state.boostActive) {
+        state.boost = Math.max(0, state.boost - 35 * delta);
+      } else {
+        state.boost = Math.min(state.maxBoost, state.boost + (10 + state.boostLevel * 0.6) * delta);
+      }
+      state.energy = Math.max(0, state.energy - (0.8 + state.boostActive * 2.6) * delta);
+      if (state.energy <= 0) {
+        state.speed = Math.max(4, state.speed - 0.5 * delta);
+        setMessage('Battery critical. Gather shards or dock at a station.');
+      }
+
+      const targetCam = tempVec.set(ship.position.x, ship.position.y + 9, ship.position.z + 16);
+      camera.position.lerp(targetCam, 0.08);
+      camera.lookAt(ship.position.x, ship.position.y + 1, ship.position.z);
+
+      state.distance = Math.max(state.distance, Math.floor(Math.sqrt(ship.position.x ** 2 + ship.position.z ** 2)));
+    }
+
+    function updateUI() {
+      document.getElementById('credits').textContent = Math.floor(state.credits);
+      document.getElementById('scrap').textContent = Math.floor(state.scrap);
+      document.getElementById('level').textContent = state.level;
+      document.getElementById('distance').textContent = state.distance;
+      document.getElementById('energyFill').style.width = `${(state.energy / state.maxEnergy) * 100}%`;
+      document.getElementById('boostFill').style.width = `${(state.boost / state.maxBoost) * 100}%`;
+      updateShop();
+    }
+
+    const mini = document.getElementById('minimap');
+    const mctx = mini.getContext('2d');
+    function drawMinimap() {
+      const w = mini.width, h = mini.height;
+      mctx.clearRect(0, 0, w, h);
+      mctx.fillStyle = 'rgba(8,14,28,0.9)';
+      mctx.fillRect(0, 0, w, h);
+      mctx.strokeStyle = 'rgba(120,170,255,0.2)';
+      mctx.strokeRect(1, 1, w - 2, h - 2);
+      const scale = 2.2;
+      mctx.save();
+      mctx.translate(w / 2, h / 2);
+      mctx.fillStyle = 'rgba(100,180,255,0.18)';
+      mctx.beginPath(); mctx.arc(0, 0, 56, 0, Math.PI * 2); mctx.fill();
+      for (const obj of salvageItems) {
+        if (!obj.parent) continue;
+        const dx = (obj.position.x - ship.position.x) * scale;
+        const dz = (obj.position.z - ship.position.z) * scale;
+        if (dx * dx + dz * dz > 60 * 60) continue;
+        mctx.fillStyle = 'rgba(255,216,94,0.95)';
+        mctx.fillRect(dx - 1, dz - 1, 2, 2);
+      }
+      for (const s of stations) {
+        if (!s.mesh.parent) continue;
+        const dx = (s.mesh.position.x - ship.position.x) * scale;
+        const dz = (s.mesh.position.z - ship.position.z) * scale;
+        mctx.fillStyle = 'rgba(110,250,255,0.95)';
+        mctx.fillRect(dx - 2, dz - 2, 4, 4);
+      }
+      mctx.fillStyle = 'white';
+      mctx.beginPath(); mctx.arc(0, 0, 3, 0, Math.PI * 2); mctx.fill();
+      mctx.restore();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = Math.min(clock.getDelta(), 0.033);
+      if (gameStarted) {
+        maintainWorld();
+        updateMovement(delta);
+        collectSalvage(delta);
+        updateHazards(delta);
+        updateStations(delta);
+        updateUI();
+        drawMinimap();
+        saveGame();
+      }
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // Seed world immediately around start position so the scene isn't empty.
+    for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) makeChunk(x, z);
+    ship.position.set(0, 4.5, 0);
+    camera.position.set(0, 12, 16);
+    camera.lookAt(ship.position);
+    updateShop();
+    updateUI();
+    drawMinimap();
+    animate();
+  </script>
 </body>
 </html>
